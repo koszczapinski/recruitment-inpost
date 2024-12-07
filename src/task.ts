@@ -10,7 +10,7 @@ export interface CategoryProvider {
   getCategories(): Promise<{ data: CategorySource[] }>;
 }
 
-interface CategoryListElement {
+export interface CategoryListElement {
   name: string;
   id: number;
   image: string;
