@@ -1,4 +1,14 @@
-import { getCategories } from "./mockedApi";
+interface CategorySource {
+  id: number;
+  name: string;
+  Title: string;
+  MetaTagDescription: string;
+  children: CategorySource[];
+}
+
+export interface CategoryProvider {
+  getCategories(): Promise<{ data: CategorySource[] }>;
+}
 
 export interface CategoryListElement {
   name: string;
@@ -9,88 +19,79 @@ export interface CategoryListElement {
   showOnHome: boolean;
 }
 
-export const categoryTree = async (): Promise<CategoryListElement[]> => {
+const extractOrder = (
+  title: string | undefined,
+  defaultValue: number
+): number => {
+  if (!title) return defaultValue;
 
-  const res = await getCategories();
+  const orderStr = title.includes('#') ? title.split('#')[0] : title;
+  const order = parseInt(orderStr);
+  return isNaN(order) ? defaultValue : order;
+};
+
+const mapCategory = (
+  source: CategorySource,
+  level: number
+): CategoryListElement => {
+  const order = extractOrder(source.Title, source.id);
+
+  const children =
+    source.children?.map((child) => mapCategory(child, level + 1)) || [];
+
+  if (children.length > 0) {
+    children.sort((a, b) => a.order - b.order);
+  }
+
+  return {
+    id: source.id,
+    name: source.name,
+    image: source.MetaTagDescription,
+    order,
+    children,
+    showOnHome: false,
+  };
+};
+
+const determineHomeVisibility = (
+  categories: CategoryListElement[],
+  markedIds: number[]
+): void => {
+  if (categories.length <= 5) {
+    categories.forEach((cat) => (cat.showOnHome = true));
+  } else if (markedIds.length > 0) {
+    categories.forEach((cat) => (cat.showOnHome = markedIds.includes(cat.id)));
+  } else {
+    categories.forEach((cat, index) => (cat.showOnHome = index < 3));
+  }
+};
+
+export const categoryTree = async (
+  provider: CategoryProvider
+): Promise<CategoryListElement[]> => {
+  const res = await provider.getCategories();
 
   if (!res.data) {
     return [];
   }
 
-  const toShowOnHome: number[] = [];
+  const markedForHome: number[] = [];
 
-  let result = res.data.map((c1) => {
-    let order = c1.Title;
-    if (c1.Title && c1.Title.includes("#")) {
-      order = c1.Title.split("#")[0];
-      toShowOnHome.push(c1.id);
+  // Extract IDs marked for home display
+  res.data.forEach((category) => {
+    if (category.Title?.includes('#')) {
+      markedForHome.push(category.id);
     }
-
-    let orderL1 = parseInt(order);
-    if (isNaN(orderL1)) {
-      orderL1 = c1.id;
-    }
-    let l2Kids = c1.children
-      ? c1.children.map((c2) => {
-          let order2 = c1.Title;
-          if (c2.Title && c2.Title.includes("#")) {
-            order2 = c2.Title.split("#")[0];
-          }
-          let orderL2 = parseInt(order2);
-          if (isNaN(orderL2)) {
-            orderL2 = c2.id;
-          }
-          let l3Kids = c2.children
-            ? c2.children.map((c3) => {
-                let order3 = c1.Title;
-                if (c3.Title && c3.Title.includes("#")) {
-                  order3 = c3.Title.split("#")[0];
-                }
-                let orderL3 = parseInt(order3);
-                if (isNaN(orderL3)) {
-                  orderL3 = c3.id;
-                }
-                return {
-                  id: c3.id,
-                  image: c3.MetaTagDescription,
-                  name: c3.name,
-                  order: orderL3,
-                  children: [],
-                  showOnHome: false,
-                };
-              })
-            : [];
-          l3Kids.sort((a, b) => a.order - b.order);
-          return {
-            id: c2.id,
-            image: c2.MetaTagDescription,
-            name: c2.name,
-            order: orderL2,
-            children: l3Kids,
-            showOnHome: false,
-          };
-        })
-      : [];
-    l2Kids.sort((a, b) => a.order - b.order);
-    return {
-      id: c1.id,
-      image: c1.MetaTagDescription,
-      name: c1.name,
-      order: orderL1,
-      children: l2Kids,
-      showOnHome: false,
-    };
   });
 
+  // Map and transform categories
+  const result = res.data.map((category) => mapCategory(category, 1));
+
+  // Sort top level categories
   result.sort((a, b) => a.order - b.order);
 
-  if (result.length <= 5) {
-    result.forEach((a) => (a.showOnHome = true));
-  } else if (toShowOnHome.length > 0) {
-    result.forEach((x) => (x.showOnHome = toShowOnHome.includes(x.id)));
-  } else {
-    result.forEach((x, index) => (x.showOnHome = index < 3));
-  }
+  // Set home visibility
+  determineHomeVisibility(result, markedForHome);
 
   return result;
 };
