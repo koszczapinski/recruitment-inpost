@@ -63,11 +63,10 @@ Problem został rozwiązany poprzez:
 
 - Poprawne wydobywanie numerów porządkowych z tytułów
 - Implementację sortowania na każdym poziomie drzewa kategorii
-- Zachowanie domyślnego sortowania po ID gdy brak explicit order
 
 ### 4. Dowód poprawności
 
-Utworzono kompleksowe testy jednostkowe sprawdzające:
+Utworzono testy jednostkowe sprawdzające:
 
 - Sortowanie kategorii pierwszego poziomu
 - Sortowanie kategorii drugiego poziomu
